@@ -404,7 +404,7 @@ else bouw();
 
 /* ---------- Voorstelvenster en formulier rechtstreeks versturen (Web3Forms) ---------- */
 (function(){
-var SLEUTEL='WEB3FORMS_SLEUTEL';
+var SLEUTEL='9f5ceca4-e9a2-4cc4-b9e2-5282d1c6c894';
 var VOORBEELD=SLEUTEL.indexOf('WEB3FORMS')===0;
 var ADRES='https://api.web3forms.com/submit';
 
