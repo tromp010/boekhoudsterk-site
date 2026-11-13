@@ -401,3 +401,149 @@ console.log('mobiel menu: '+paneel.querySelectorAll('a').length+' links');
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bouw);
 else bouw();
 })();
+
+/* ---------- Voorstelvenster en formulier rechtstreeks versturen (Web3Forms) ---------- */
+(function(){
+var SLEUTEL='WEB3FORMS_SLEUTEL';
+var VOORBEELD=SLEUTEL.indexOf('WEB3FORMS')===0;
+var ADRES='https://api.web3forms.com/submit';
+
+function tekst(el){if(!el)return '';var c=el.cloneNode(true);var s=c.querySelectorAll('span');for(var i=0;i<s.length;i++){var t=s[i].textContent.trim();if(t==='+'||t==='-'||t==='–'||t==='−')s[i].parentNode.removeChild(s[i]);}return c.textContent.replace(/\s+/g,' ').trim();}
+function actief(sel){return document.querySelector(sel+'[aria-pressed="true"]');}
+function waarde(id){var e=document.getElementById(id);return e?e.value.trim():'';}
+
+function berekening(){
+ var r=[];
+ var f=actief('[data-form]');if(f)r.push(['Rechtsvorm',tekst(f)]);
+ var v=actief('[data-vol]');if(v)r.push(['Boekstukken per maand',tekst(v)]);
+ var l=document.getElementById('v4t-loonaantal');r.push(['Loonstroken per maand',l?(l.value||'0'):'0']);
+ var ex=[];var e=document.querySelectorAll('[data-extra][aria-pressed="true"]');for(var i=0;i<e.length;i++)ex.push(tekst(e[i]));
+ r.push(['Aanvullend',ex.length?ex.join(', '):'geen']);
+ var b=actief('[data-billing]');if(b)r.push(['Betaling',tekst(b)]);
+ var p=document.getElementById('v4t-calc-price'),j=document.getElementById('v4t-calc-year'),a=document.getElementById('v4t-calc-plan');
+ if(a)r.push(['Abonnement',a.textContent.trim()]);
+ if(p)r.push(['Indicatie per maand',p.textContent.trim()]);
+ if(j)r.push(['Indicatie per jaar',j.textContent.trim()]);
+ return r;
+}
+
+function verstuur(velden){
+ if(VOORBEELD)return new Promise(function(ok){setTimeout(function(){ok({success:true});},700);});
+ var d={access_key:SLEUTEL,from_name:'Website Boekhoudsterk',botcheck:''};
+ for(var k in velden)d[k]=velden[k];
+ return fetch(ADRES,{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json();});
+}
+
+function fout(plek,zin){
+ var oud=plek.querySelector('.bs-formfout');if(oud)oud.parentNode.removeChild(oud);
+ if(!zin)return;
+ var p=document.createElement('p');p.className='bs-formfout';p.setAttribute('role','alert');p.textContent=zin;plek.appendChild(p);
+}
+function geldig(mail){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail);}
+var MISLUKT='Het versturen is niet gelukt. Probeer het nog eens, of mail naar info@boekhoudsterk.nl of bel 085 250 1026.';
+
+/* 1. Venster bij de rekenmodule */
+var venster=null;
+function bouwVenster(){
+ var d=document.createElement('dialog');
+ d.className='bs-venster';
+ d.setAttribute('aria-labelledby','bs-venster-kop');
+ d.innerHTML=
+  '<button type="button" class="bs-venster-sluit" aria-label="Venster sluiten">&times;</button>'+
+  '<div class="bs-venster-inhoud">'+
+   '<p class="bs-venster-label">Uw berekening</p>'+
+   '<h2 id="bs-venster-kop">Vraag uw voorstel aan</h2>'+
+   '<dl class="bs-venster-som"></dl>'+
+   '<form class="bs-form-velden" novalidate>'+
+    '<label>Uw naam<input type="text" name="naam" autocomplete="name" placeholder="Voor- en achternaam" required></label>'+
+    '<label>Bedrijfsnaam<input type="text" name="bedrijf" autocomplete="organization" placeholder="Optioneel"></label>'+
+    '<label>E-mailadres<input type="email" name="email" autocomplete="email" placeholder="naam@bedrijf.nl" required></label>'+
+    '<label>Telefoonnummer<input type="tel" name="telefoon" autocomplete="tel" placeholder="Zodat wij kunnen terugbellen"></label>'+
+    '<label class="breed">Toelichting<textarea name="toelichting" rows="3" placeholder="Optioneel: wat moeten wij nog weten?"></textarea></label>'+
+    '<input type="checkbox" name="botcheck" class="bs-verborgen" tabindex="-1" autocomplete="off">'+
+    '<div class="breed bs-venster-voet">'+
+     '<button type="submit" class="btn btn-primary blueprint"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>Verstuur aanvraag</button>'+
+     '<p class="bs-venster-klein">Wij reageren met een voorstel op maat. Liever bellen? 085 250 1026.</p>'+
+    '</div>'+
+   '</form>'+
+  '</div>'+
+  '<div class="bs-venster-dank" hidden>'+
+   '<p class="bs-venster-label">Verstuurd</p>'+
+   '<h2>Bedankt, uw aanvraag is binnen</h2>'+
+   '<p>Wij nemen zo snel mogelijk contact met u op om uw voorstel door te nemen.</p>'+
+   '<button type="button" class="btn btn-primary blueprint bs-venster-klaar"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>Sluiten</button>'+
+  '</div>';
+ document.body.appendChild(d);
+ d.querySelector('.bs-venster-sluit').addEventListener('click',function(){d.close();});
+ d.querySelector('.bs-venster-klaar').addEventListener('click',function(){d.close();});
+ d.addEventListener('click',function(e){if(e.target===d)d.close();});
+ var form=d.querySelector('form');
+ form.addEventListener('submit',function(e){
+  e.preventDefault();
+  if(form.botcheck.checked)return;
+  var naam=form.naam.value.trim(),mail=form.email.value.trim();
+  var voet=d.querySelector('.bs-venster-voet');
+  if(!naam||!geldig(mail)){fout(voet,'Vul uw naam en een geldig e-mailadres in.');(naam?form.email:form.naam).focus();return;}
+  fout(voet,'');
+  var knop=form.querySelector('button[type=submit]');knop.disabled=true;
+  var som=d._som||[];
+  var regels=som.map(function(r){return r[0]+': '+r[1];}).join('\n');
+  verstuur({
+   subject:'Voorstelaanvraag via de rekenmodule: '+naam,
+   naam:naam,bedrijf:form.bedrijf.value.trim()||'-',email:mail,telefoon:form.telefoon.value.trim()||'-',
+   berekening:regels,toelichting:form.toelichting.value.trim()||'-',pagina:location.pathname
+  }).then(function(res){
+   knop.disabled=false;
+   if(res&&res.success){d.querySelector('.bs-venster-inhoud').hidden=true;var t=d.querySelector('.bs-venster-dank');t.hidden=false;t.querySelector('button').focus();form.reset();}
+   else fout(voet,MISLUKT);
+  }).catch(function(){knop.disabled=false;fout(voet,MISLUKT);});
+ });
+ return d;
+}
+function openVenster(){
+ if(!venster)venster=bouwVenster();
+ var som=berekening();venster._som=som;
+ var dl=venster.querySelector('.bs-venster-som');dl.innerHTML='';
+ som.forEach(function(r){var dt=document.createElement('dt');dt.textContent=r[0];var dd=document.createElement('dd');dd.textContent=r[1];dl.appendChild(dt);dl.appendChild(dd);});
+ venster.querySelector('.bs-venster-inhoud').hidden=false;venster.querySelector('.bs-venster-dank').hidden=true;
+ fout(venster.querySelector('.bs-venster-voet'),'');
+ if(venster.showModal)venster.showModal();else venster.setAttribute('open','');
+ setTimeout(function(){venster.querySelector('input[name=naam]').focus();},50);
+}
+document.addEventListener('click',function(ev){
+ var k=ev.target&&ev.target.closest?ev.target.closest('a,button'):null;
+ if(!k||!k.closest('.v4t-calc')||!/voorstel/i.test(k.textContent))return;
+ ev.preventDefault();ev.stopImmediatePropagation();
+ openVenster();
+},true);
+
+/* 2. Contactformulier rechtstreeks versturen */
+function contact(){
+ var knop=document.getElementById('f-verstuur');if(!knop)return;
+ var uitleg=document.querySelector('.bs-form-uitleg');
+ if(uitleg)uitleg.textContent='Uw bericht komt direct bij ons binnen. Liever bellen? Dat kan op 085 250 1026.';
+ knop.addEventListener('click',function(ev){
+  ev.preventDefault();ev.stopImmediatePropagation();
+  var naam=waarde('f-naam'),mail=waarde('f-mail'),vraag=waarde('f-bericht');
+  var plek=knop.parentNode;
+  var mis=!naam?'f-naam':(!geldig(mail)?'f-mail':(!vraag?'f-bericht':''));
+  if(mis){fout(plek,'Vul uw naam, een geldig e-mailadres en uw vraag in.');document.getElementById(mis).focus();return;}
+  fout(plek,'');knop.disabled=true;
+  verstuur({
+   subject:'Bericht via de website: '+(waarde('f-onderwerp')||'contact')+' ('+naam+')',
+   naam:naam,bedrijf:waarde('f-bedrijf')||'-',email:mail,telefoon:waarde('f-tel')||'-',
+   onderwerp:waarde('f-onderwerp')||'-',vraag:vraag
+  }).then(function(res){
+   knop.disabled=false;
+   if(res&&res.success){
+    var velden=document.querySelector('.bs-form-velden');
+    var dank=document.createElement('div');dank.className='bs-form-dank';dank.setAttribute('role','status');
+    dank.innerHTML='<p class="bs-venster-label">Verstuurd</p><h2>Bedankt, uw bericht is binnen</h2><p>Wij nemen zo snel mogelijk contact met u op.</p>';
+    velden.parentNode.replaceChild(dank,velden);
+    dank.scrollIntoView({behavior:'smooth',block:'center'});
+   }else fout(plek,MISLUKT);
+  }).catch(function(){knop.disabled=false;fout(plek,MISLUKT);});
+ },true);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',contact);else contact();
+})();
