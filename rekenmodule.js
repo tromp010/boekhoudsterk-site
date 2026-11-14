@@ -16,7 +16,7 @@ return som;
 }
 
 var state = { jaar: false, form: "EZ", vol: 1, loon: 0, extras: { jaarrek: false, advies: false, btw: true } };
-function fmt(n) { return "\u20ac " + (Math.round(n * 100) / 100).toLocaleString("nl-NL", { minimumFractionDigits: 0, maximumFractionDigits: 2 }); }
+function fmt(n) { var r = Math.round(n * 100) / 100; var heel = r === Math.round(r); return "\u20ac " + r.toLocaleString("nl-NL", { minimumFractionDigits: heel ? 0 : 2, maximumFractionDigits: 2 }); }
 function price() {
 var p = BASIS[state.form][state.vol], e = state.extras;
 p += loonKosten(state.loon) + (e.jaarrek ? JAARREKENING : 0) + (e.advies ? FISCAAL_ADVIES : 0) + (e.btw ? 0 : KORTING_GEEN_BTW);
@@ -26,8 +26,8 @@ function render() {
 var out = document.getElementById("v4t-calc-price");
 if (out) {
 var p = price();
-out.textContent = fmt(p);
-document.getElementById("v4t-calc-year").textContent = fmt(p * 12);
+out.textContent = fmt(Math.round(p));
+document.getElementById("v4t-calc-year").textContent = fmt(Math.round(p) * 12);
 document.getElementById("v4t-calc-plan").textContent = p < GRENS_BASIC ? "Basic" : p < GRENS_PROF ? "Professional" : "Excellent";
 }
 var ls = document.getElementById("v4t-loonbedrag");
