@@ -426,6 +426,13 @@ function berekening(){
  if(j)r.push(['Indicatie per jaar',j.textContent.trim()]);
  return r;
 }
+/* Laatste berekening onthouden, zodat die ook met het contactformulier meegaat */
+var GEHEUGEN='bs-berekening';
+function onthoud(){if(!document.querySelector('.v4t-calc'))return;try{sessionStorage.setItem(GEHEUGEN,JSON.stringify(berekening()));}catch(x){}}
+function herinnering(){try{var s=sessionStorage.getItem(GEHEUGEN);return s?JSON.parse(s):null;}catch(x){return null;}}
+function alsTekst(som){return som.map(function(r){return r[0]+': '+r[1];}).join('\n');}
+document.addEventListener('click',function(ev){if(ev.target&&ev.target.closest&&ev.target.closest('.v4t-calc'))setTimeout(onthoud,30);});
+document.addEventListener('input',function(ev){if(ev.target&&ev.target.closest&&ev.target.closest('.v4t-calc'))setTimeout(onthoud,30);});
 
 function verstuur(velden){
  if(VOORBEELD)return new Promise(function(ok){setTimeout(function(){ok({success:true});},700);});
@@ -487,9 +494,9 @@ function bouwVenster(){
   fout(voet,'');
   var knop=form.querySelector('button[type=submit]');knop.disabled=true;
   var som=d._som||[];
-  var regels=som.map(function(r){return r[0]+': '+r[1];}).join('\n');
+  var regels=alsTekst(som);
   verstuur({
-   subject:'Voorstelaanvraag via de rekenmodule: '+naam,
+   subject:(d._modus==='bericht'?'Bericht via de website: ':'Voorstelaanvraag via de rekenmodule: ')+naam,
    naam:naam,bedrijf:form.bedrijf.value.trim()||'-',email:mail,telefoon:form.telefoon.value.trim()||'-',
    berekening:regels,toelichting:form.toelichting.value.trim()||'-',pagina:location.pathname
   }).then(function(res){
@@ -500,9 +507,14 @@ function bouwVenster(){
  });
  return d;
 }
-function openVenster(){
+function openVenster(pakket,modus){
  if(!venster)venster=bouwVenster();
- var som=berekening();venster._som=som;
+ var som=berekening();
+ if(pakket)som.unshift(['Gekozen pakket',pakket]);
+ venster._som=som;venster._modus=modus||'voorstel';
+ var bericht=modus==='bericht';
+ venster.querySelector('#bs-venster-kop').textContent=bericht?'Stuur ons een bericht':'Vraag uw voorstel aan';
+ venster.querySelector('textarea[name=toelichting]').placeholder=bericht?'Uw vraag of bericht':'Optioneel: wat moeten wij nog weten?';
  var dl=venster.querySelector('.bs-venster-som');dl.innerHTML='';
  som.forEach(function(r){var dt=document.createElement('dt');dt.textContent=r[0];var dd=document.createElement('dd');dd.textContent=r[1];dl.appendChild(dt);dl.appendChild(dd);});
  venster.querySelector('.bs-venster-inhoud').hidden=false;venster.querySelector('.bs-venster-dank').hidden=true;
@@ -512,9 +524,20 @@ function openVenster(){
 }
 document.addEventListener('click',function(ev){
  var k=ev.target&&ev.target.closest?ev.target.closest('a,button'):null;
- if(!k||!k.closest('.v4t-calc')||!/voorstel/i.test(k.textContent))return;
- ev.preventDefault();ev.stopImmediatePropagation();
- openVenster();
+ if(!k)return;
+ var t=k.textContent.replace(/\s+/g,' ').trim();
+ var heeftCalc=!!document.querySelector('.v4t-calc');
+ var pakket=(/^Kies (Basic|Professional|Excellent)$/.exec(t)||[])[1];
+ var mailknop=k.matches('a.btn[href^="mailto:"]');
+ if(heeftCalc&&k.closest('.v4t-calc')&&/voorstel/i.test(t)){ev.preventDefault();ev.stopImmediatePropagation();openVenster();return;}
+ if(heeftCalc&&pakket){ev.preventDefault();ev.stopImmediatePropagation();openVenster(pakket);return;}
+ if(heeftCalc&&mailknop){ev.preventDefault();ev.stopImmediatePropagation();openVenster(null,'bericht');return;}
+ if(mailknop&&document.getElementById('f-naam')){
+  ev.preventDefault();ev.stopImmediatePropagation();
+  var veld=document.getElementById('f-naam');
+  veld.scrollIntoView({behavior:'smooth',block:'center'});
+  setTimeout(function(){veld.focus({preventScroll:true});},450);
+ }
 },true);
 
 /* 2. Contactformulier rechtstreeks versturen */
@@ -522,6 +545,15 @@ function contact(){
  var knop=document.getElementById('f-verstuur');if(!knop)return;
  var uitleg=document.querySelector('.bs-form-uitleg');
  if(uitleg)uitleg.textContent='Uw bericht komt direct bij ons binnen. Liever bellen? Dat kan op 085 250 1026.';
+ var eerder=herinnering();
+ if(eerder&&eerder.length){
+  var velden0=document.querySelector('.bs-form-velden');
+  var blok=document.createElement('div');blok.className='breed bs-form-meesturen';
+  blok.innerHTML='<p class="bs-venster-label">Uw berekening gaat mee</p><dl class="bs-venster-som"></dl>';
+  var dl=blok.querySelector('dl');
+  eerder.forEach(function(r){var dt=document.createElement('dt');dt.textContent=r[0];var dd=document.createElement('dd');dd.textContent=r[1];dl.appendChild(dt);dl.appendChild(dd);});
+  if(velden0)velden0.insertBefore(blok,velden0.firstChild);
+ }
  knop.addEventListener('click',function(ev){
   ev.preventDefault();ev.stopImmediatePropagation();
   var naam=waarde('f-naam'),mail=waarde('f-mail'),vraag=waarde('f-bericht');
@@ -532,7 +564,8 @@ function contact(){
   verstuur({
    subject:'Bericht via de website: '+(waarde('f-onderwerp')||'contact')+' ('+naam+')',
    naam:naam,bedrijf:waarde('f-bedrijf')||'-',email:mail,telefoon:waarde('f-tel')||'-',
-   onderwerp:waarde('f-onderwerp')||'-',vraag:vraag
+   onderwerp:waarde('f-onderwerp')||'-',vraag:vraag,
+   berekening:eerder&&eerder.length?alsTekst(eerder):'niet ingevuld'
   }).then(function(res){
    knop.disabled=false;
    if(res&&res.success){

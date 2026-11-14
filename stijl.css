@@ -1406,3 +1406,5 @@ section:has(> .v4t-wrap .v4t-faq) .v4t-faq details[open]{background:rgba(255,255
 .bs-verborgen{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
 .bs-formfout{flex-basis:100%;margin:4px 0 0;color:#a32d2d;font-size:14px}
 .bs-form-dank{padding:36px 32px;background:var(--color-accent-100);border-left:3px solid var(--color-accent-900)}
+.bs-form-meesturen{grid-column:1/-1}
+.bs-form-meesturen .bs-venster-som{margin-bottom:4px}
